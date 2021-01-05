@@ -5,7 +5,7 @@ from itertools import product
 from collections import defaultdict
 import tqdm
 import random
-from parse import get_all_preds_for_execution, remove_distinct
+from .parse import get_all_preds_for_execution, remove_distinct
 import time
 import pickle as pkl
 import subprocess
@@ -14,7 +14,7 @@ from itertools import chain
 
 threadLock = threading.Lock()
 TIMEOUT = 60
-EXEC_TMP_DIR = "tmp/"
+EXEC_TMP_DIR = os.path.join(os.path.dirname(__file__), "tmp")
 
 
 def permute_tuple(element: Tuple, perm: Tuple) -> Tuple:
@@ -139,8 +139,9 @@ def exec_on_db(
             f_prefix = os.path.join(EXEC_TMP_DIR, process_id)
         pkl.dump((sqlite_path, query), open(f_prefix + ".in", "wb"))
     try:
+        exec_script_fpath = os.path.join(os.path.dirname(__file__), "exec_subprocess.py")
         subprocess.call(
-            ["python3", "exec_subprocess.py", f_prefix],
+            ["python3", exec_script_fpath, f_prefix],
             timeout=timeout,
             stderr=open("runerr.log", "a"),
         )

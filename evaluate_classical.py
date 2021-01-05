@@ -2,7 +2,7 @@ import argparse
 from typing import List, Dict, Any, Tuple
 import pickle as pkl
 import tqdm
-from exec_eval import exec_on_db, result_eq
+from .exec_eval import exec_on_db, result_eq
 import os
 from collections import defaultdict
 import time
