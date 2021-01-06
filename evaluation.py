@@ -448,10 +448,6 @@ class Evaluator:
 
         self.db_paths = {}
         self.schemas = {}
-        for db_name in self.kmaps.keys():
-            db_path = os.path.join(db_dir, db_name, db_name + ".sqlite")
-            self.db_paths[db_name] = db_path
-            self.schemas[db_name] = Schema(get_schema(db_path))
 
         self.scores = {}
 
@@ -606,6 +602,11 @@ class Evaluator:
         return res
 
     def evaluate_one(self, db_name, gold, predicted, turn_scores, idx):
+        if db_name not in self.db_paths:
+            db_path = os.path.join(self.db_dir, db_name, db_name + ".sqlite")
+            self.db_paths[db_name] = db_path
+            self.schemas[db_name] = Schema(get_schema(db_path))
+
         schema = self.schemas[db_name]
         g_sql = get_sql(schema, gold)
         hardness = self.eval_hardness(g_sql)
