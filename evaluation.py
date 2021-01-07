@@ -906,6 +906,7 @@ def evaluate(
         if all(v == 1 for v in turn_scores["exact"]):
             evaluator.scores["joint_all"]["exact"] += 1
 
+    evaluator.finalize()
     print_scores(evaluator.scores, etype, include_turn_acc=include_turn_acc)
     return {
         "per_item": results,
