@@ -143,7 +143,7 @@ def exec_on_db(
         subprocess.call(
             ["python3", exec_script_fpath, f_prefix],
             timeout=timeout,
-            stderr=open("runerr.log", "a"),
+            stderr=open(os.path.join(os.path.dirname(__file__), "tmp", "runerr.log"), "a"),
         )
     except Exception as e:
         print(e)
