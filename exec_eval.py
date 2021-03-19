@@ -194,7 +194,11 @@ def eval_exec_match(
     # e.g. removing spaces between ">" and "="
     p_str, g_str = postprocess(p_str), postprocess(g_str)
     if not keep_distinct:
-        p_str = remove_distinct(p_str)
+        try:
+            # if sqlparse can't parse p_str, we should not even try to execute it
+            p_str = remove_distinct(p_str)
+        except Exception as e:
+            return 0
         g_str = remove_distinct(g_str)
 
     # we decide whether two denotations are equivalent based on "bag semantics"
