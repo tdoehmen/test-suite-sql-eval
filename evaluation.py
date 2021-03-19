@@ -607,34 +607,37 @@ class Evaluator:
             self.db_paths[db_name] = db_path
             self.schemas[db_name] = Schema(get_schema(db_path))
 
-        schema = self.schemas[db_name]
-        g_sql = get_sql(schema, gold)
-        hardness = self.eval_hardness(g_sql)
         if idx > 3:
             idx = "> 4"
         else:
             idx += 1
         turn_id = "turn " + str(idx)
+
         self.scores[turn_id]["count"] += 1
-        self.scores[hardness]["count"] += 1
         self.scores["all"]["count"] += 1
 
-        try:
-            p_sql = get_sql(schema, predicted)
-        except:
-            # If p_sql is not valid, then we will use an empty sql to evaluate with the correct sql
-            p_sql = {
-                "except": None,
-                "from": {"conds": [], "table_units": []},
-                "groupBy": [],
-                "having": [],
-                "intersect": None,
-                "limit": None,
-                "orderBy": [],
-                "select": [False, []],
-                "union": None,
-                "where": [],
-            }
+        if self.etype in ['all', 'match']:
+            schema = self.schemas[db_name]
+            g_sql = get_sql(schema, gold)
+            hardness = self.eval_hardness(g_sql)
+            self.scores[hardness]["count"] += 1
+
+            try:
+                p_sql = get_sql(schema, predicted)
+            except:
+                # If p_sql is not valid, then we will use an empty sql to evaluate with the correct sql
+                p_sql = {
+                    "except": None,
+                    "from": {"conds": [], "table_units": []},
+                    "groupBy": [],
+                    "having": [],
+                    "intersect": None,
+                    "limit": None,
+                    "orderBy": [],
+                    "select": [False, []],
+                    "union": None,
+                    "where": [],
+                }
 
         if self.etype in ["all", "exec"]:
             exec_score = eval_exec_match(
@@ -646,7 +649,8 @@ class Evaluator:
                 progress_bar_for_each_datapoint=self.progress_bar_for_each_datapoint,
             )
             if exec_score:
-                self.scores[hardness]["exec"] += 1
+                if self.etype == 'all':
+                    self.scores[hardness]["exec"] += 1
                 self.scores[turn_id]["exec"] += 1
                 self.scores["all"]["exec"] += 1
                 turn_scores["exec"].append(1)
@@ -704,13 +708,19 @@ class Evaluator:
                     self.scores["all"]["partial"][type_]["rec_count"] += 1
                 self.scores["all"]["partial"][type_]["f1"] += partial_scores[type_]["f1"]
 
-            return {
-                "predictSQL": predicted,
-                "goldSQL": gold,
+        result = {
+            "predictSQL": predicted,
+            "goldSQL": gold,
+        }
+        if self.etype in ['all', 'match']:
+            result.extend({
                 "hardness": hardness,
                 "exact": exact_score,
                 "partial": partial_scores,
-            }
+            })
+        if self.etype in ['all', 'exec']:
+            result['exec'] = exec_score
+        return result
 
     def finalize(self):
         scores = self.scores
