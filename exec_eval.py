@@ -11,7 +11,6 @@ import random
 import time
 import pickle as pkl
 import subprocess
-import timeout_decorator
 from itertools import chain
 
 from .parse import get_all_preds_for_execution, remove_distinct
