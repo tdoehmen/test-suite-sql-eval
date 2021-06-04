@@ -713,7 +713,7 @@ class Evaluator:
             "goldSQL": gold,
         }
         if self.etype in ['all', 'match']:
-            result.extend({
+            result.update({
                 "hardness": hardness,
                 "exact": exact_score,
                 "partial": partial_scores,
