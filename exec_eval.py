@@ -1,6 +1,5 @@
 import os
 import re
-import sqlite3
 import asyncio
 import threading
 from typing import Tuple, Any, List, Set
@@ -11,6 +10,7 @@ import random
 import time
 import pickle as pkl
 import subprocess
+import duckdb
 from itertools import chain
 
 from .parse import get_all_preds_for_execution, remove_distinct
@@ -134,7 +134,7 @@ def get_cursor_from_path(sqlite_path: str):
     try:
         if not os.path.exists(sqlite_path):
             print("Openning a new connection %s" % sqlite_path)
-        connection = sqlite3.connect(sqlite_path)
+        connection = duckdb.connect(sqlite_path)
     except Exception as e:
         print(sqlite_path)
         raise e
@@ -143,25 +143,22 @@ def get_cursor_from_path(sqlite_path: str):
     return cursor
 
 
-async def exec_on_db_(sqlite_path: str, query: str) -> Tuple[str, Any]:
+async def exec_on_db_(conn, query: str, setup_sql: str, cleanup_sql: str) -> Tuple[str, Any]:
     query = replace_cur_year(query)
-    cursor = get_cursor_from_path(sqlite_path)
     try:
-        cursor.execute(query)
-        result = cursor.fetchall()
-        cursor.close()
-        cursor.connection.close()
+        conn.execute(setup_sql)
+        result = conn.execute(query).fetchall()
         return "result", result
     except Exception as e:
-        cursor.close()
-        cursor.connection.close()
         return "exception", e
+    finally:
+        conn.execute(cleanup_sql)
 
 async def exec_on_db(
-    sqlite_path: str, query: str, process_id: str = "", timeout: int = TIMEOUT
+    conn, query: str, setup_sql: str, cleanup_sql: str
 ) -> Tuple[str, Any]:
     try:
-        return await asyncio.wait_for(exec_on_db_(sqlite_path, query), timeout)
+        return await asyncio.wait_for(exec_on_db_(conn, query, setup_sql, cleanup_sql), TIMEOUT)
     except asyncio.TimeoutError:
         return ('exception', TimeoutError)
     except Exception as e:
@@ -186,6 +183,9 @@ def eval_exec_match(
     db: str,
     p_str: str,
     g_str: str,
+    conn,
+    setup_sql: str,
+    cleanup_sql: str,
     plug_value: bool,
     keep_distinct: bool,
     progress_bar_for_each_datapoint: bool,
@@ -210,11 +210,6 @@ def eval_exec_match(
 
     # find all databases in the same directory
     db_dir = os.path.dirname(db)
-    db_paths = [
-        os.path.join(db_dir, basename)
-        for basename in os.listdir(db_dir)
-        if ".sqlite" in basename
-    ]
 
     preds = [p_str]
     # if plug in value (i.e. we do not consider value prediction correctness)
@@ -231,29 +226,29 @@ def eval_exec_match(
         pred_passes = 1
         # compare the gold and predicted denotations on each database in the directory
         # wrap with progress bar if required
-        if progress_bar_for_each_datapoint:
-            ranger = tqdm.tqdm(db_paths)
-        else:
-            ranger = db_paths
+        #if progress_bar_for_each_datapoint:
+        #    ranger = tqdm.tqdm(db_paths)
+        #else:
+        #    ranger = db_paths
 
-        for db_path in ranger:
-            g_flag, g_denotation = asyncio.run(exec_on_db(db_path, g_str))
-            p_flag, p_denotation = asyncio.run(exec_on_db(db_path, pred))
+        #for db_path in ranger:
+        g_flag, g_denotation = asyncio.run(exec_on_db(conn, g_str, setup_sql, cleanup_sql))
+        p_flag, p_denotation = asyncio.run(exec_on_db(conn, pred, setup_sql, cleanup_sql))
 
-            # we should expect the gold to be succesfully executed on the database
-            assert (
-                g_flag != "exception"
-            ), f"gold query {g_str} has error {g_denotation} on database file {db_path}"
+        # we should expect the gold to be succesfully executed on the database
+        assert (
+            g_flag != "exception"
+        ), f"gold query {g_str} has error {g_denotation} on database file {db}: {setup_sql}"
 
-            # wrong if execution fails
-            if p_flag == "exception":
-                pred_passes = 0
+        # wrong if execution fails
+        if p_flag == "exception":
+            pred_passes = 0
 
-            # if denotations are not equivalent, the prediction must be wrong
-            elif not result_eq(g_denotation, p_denotation, order_matters=order_matters):
-                pred_passes = 0
-            if pred_passes == 0:
-                break
+        # if denotations are not equivalent, the prediction must be wrong
+        elif not result_eq(g_denotation, p_denotation, order_matters=order_matters):
+            pred_passes = 0
+        if pred_passes == 0:
+            break
 
         # the model prediction has the same denotation as the gold for all databases
         if pred_passes == 1:

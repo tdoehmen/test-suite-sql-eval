@@ -21,7 +21,7 @@
 
 import os
 import json
-import sqlite3
+import duckdb
 import argparse
 
 from .process_sql import get_schema, Schema, get_sql
@@ -432,14 +432,14 @@ class Evaluator:
 
     def __init__(
         self,
-        db_dir,
+        conn,
         kmaps,
         etype,
         plug_value,
         keep_distinct,
         progress_bar_for_each_datapoint
     ):
-        self.db_dir = db_dir
+        self.conn = conn
         self.kmaps = kmaps
         self.etype = etype
         self.plug_value = plug_value
@@ -601,11 +601,21 @@ class Evaluator:
 
         return res
 
-    def evaluate_one(self, db_name, gold, predicted, turn_scores, idx):
+    def evaluate_one(self, db_name, gold, predicted, setup_sql, cleanup_sql, turn_scores, idx):
         if db_name not in self.db_paths:
-            db_path = os.path.join(self.db_dir, db_name, db_name + ".sqlite")
+            db_path = db_name
             self.db_paths[db_name] = db_path
-            self.schemas[db_name] = Schema(get_schema(db_path))
+            self.conn.execute(setup_sql)
+            res = self.conn.execute("show tables").fetchall()
+            table_names = [r[0] for r in res]
+            schemas = {}
+            for table_name in table_names:
+                sql = f"PRAGMA table_info({table_name});"
+                schema = self.conn.execute(sql).fetchall()
+                columns = [row[1] for row in schema]
+                schemas[table_name] = columns
+            self.schemas[db_name] = Schema(schemas)
+            self.conn.execute(cleanup_sql)
 
         if idx > 3:
             idx = "> 4"
@@ -644,6 +654,9 @@ class Evaluator:
                 db=self.db_paths[db_name],
                 p_str=predicted,
                 g_str=gold,
+                conn=self.conn,
+                setup_sql=setup_sql,
+                cleanup_sql=cleanup_sql,
                 plug_value=self.plug_value,
                 keep_distinct=self.keep_distinct,
                 progress_bar_for_each_datapoint=self.progress_bar_for_each_datapoint,
@@ -776,7 +789,7 @@ class Evaluator:
 
 
 def isValidSQL(sql, db):
-    conn = sqlite3.connect(db)
+    conn = duckdb.connect(db)
     cursor = conn.cursor()
     try:
         cursor.execute(sql)
