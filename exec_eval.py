@@ -233,6 +233,8 @@ def eval_exec_match(
 
         #for db_path in ranger:
         g_flag, g_denotation = asyncio.run(exec_on_db(conn, g_str, setup_sql, cleanup_sql))
+        if pred.lower().startswith("select"):
+            pred = f"select * from ({pred}) LIMIT 100"
         p_flag, p_denotation = asyncio.run(exec_on_db(conn, pred, setup_sql, cleanup_sql))
 
         # we should expect the gold to be succesfully executed on the database
