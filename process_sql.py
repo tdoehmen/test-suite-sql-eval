@@ -25,7 +25,7 @@
 ################################
 
 import json
-import sqlite3
+import duckdb
 from nltk import word_tokenize
 
 CLAUSE_KEYWORDS = (
@@ -110,17 +110,18 @@ def get_schema(db):
     """
 
     schema = {}
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
+    conn = duckdb.connect(db)
+
+
 
     # fetch table names
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = [str(table[0].lower()) for table in cursor.fetchall()]
+    res = conn.execute("show tables").fetchall()
+    tables = [r[0] for r in res]
 
     # fetch table info
     for table in tables:
-        cursor.execute("PRAGMA table_info({})".format(table))
-        schema[table] = [str(col[1].lower()) for col in cursor.fetchall()]
+        res = conn.execute("PRAGMA table_info({})".format(table))
+        schema[table] = [str(col[1].lower()) for col in res.fetchall()]
 
     return schema
 

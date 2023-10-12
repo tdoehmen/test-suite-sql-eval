@@ -603,7 +603,7 @@ class Evaluator:
 
     def evaluate_one(self, db_name, gold, predicted, turn_scores, idx):
         if db_name not in self.db_paths:
-            db_path = os.path.join(self.db_dir, db_name, db_name + ".sqlite")
+            db_path = os.path.join(self.db_dir, db_name, db_name + ".duckdb")
             self.db_paths[db_name] = db_path
             self.schemas[db_name] = Schema(get_schema(db_path))
 

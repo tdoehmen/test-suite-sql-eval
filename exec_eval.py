@@ -1,6 +1,6 @@
 import os
 import re
-import sqlite3
+import duckdb
 import asyncio
 import threading
 from typing import Tuple, Any, List, Set
@@ -130,38 +130,33 @@ def replace_cur_year(query: str) -> str:
 
 
 # get the database cursor for a sqlite database path
-def get_cursor_from_path(sqlite_path: str):
+def get_cursor_from_path(duckdb_path: str):
     try:
-        if not os.path.exists(sqlite_path):
-            print("Openning a new connection %s" % sqlite_path)
-        connection = sqlite3.connect(sqlite_path)
+        if not os.path.exists(duckdb_path):
+            print("Openning a new connection %s" % duckdb_path)
+        connection = duckdb.connect(duckdb_path)
     except Exception as e:
-        print(sqlite_path)
+        print(duckdb_path)
         raise e
-    connection.text_factory = lambda b: b.decode(errors="ignore")
-    cursor = connection.cursor()
-    return cursor
+    return connection
 
 
-async def exec_on_db_(sqlite_path: str, query: str) -> Tuple[str, Any]:
+async def exec_on_db_(duckdb_path: str, query: str) -> Tuple[str, Any]:
     query = replace_cur_year(query)
-    cursor = get_cursor_from_path(sqlite_path)
+    connection = get_cursor_from_path(duckdb_path)
     try:
-        cursor.execute(query)
-        result = cursor.fetchall()
-        cursor.close()
-        cursor.connection.close()
+        result = connection.execute(query).fetchall()
+        connection.close()
         return "result", result
     except Exception as e:
-        cursor.close()
-        cursor.connection.close()
+        connection.close()
         return "exception", e
 
 async def exec_on_db(
-    sqlite_path: str, query: str, process_id: str = "", timeout: int = TIMEOUT
+    duckdb_path: str, query: str, process_id: str = "", timeout: int = TIMEOUT
 ) -> Tuple[str, Any]:
     try:
-        return await asyncio.wait_for(exec_on_db_(sqlite_path, query), timeout)
+        return await asyncio.wait_for(exec_on_db_(duckdb_path, query), timeout)
     except asyncio.TimeoutError:
         return ('exception', TimeoutError)
     except Exception as e:
@@ -213,7 +208,7 @@ def eval_exec_match(
     db_paths = [
         os.path.join(db_dir, basename)
         for basename in os.listdir(db_dir)
-        if ".sqlite" in basename
+        if ".duckdb" in basename
     ]
 
     preds = [p_str]
