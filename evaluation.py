@@ -28,7 +28,7 @@ from .process_sql import get_schema, Schema, get_sql
 from .exec_eval import eval_exec_match
 
 # Flag to disable value evaluation
-LEVELS = ["easy", "medium", "hard", "extra", "all", "joint_all"]
+LEVELS = ["easy", "medium", "hard", "duckdb", "ddl", "all"]
 TURNS = ["turn 1", "turn 2", "turn 3", "turn 4", "turn > 4"]
 PARTIAL_TYPES = [
     "select",
@@ -90,7 +90,6 @@ HARDNESS = {
     "component1": ("where", "group", "order", "limit", "join", "or", "like"),
     "component2": ("except", "union", "intersect"),
 }
-
 
 def condition_has_or(conds):
     return "or" in conds[1::2]
@@ -601,7 +600,7 @@ class Evaluator:
 
         return res
 
-    def evaluate_one(self, db_name, gold, predicted, turn_scores, idx):
+    def evaluate_one(self, db_name, gold, predicted, turn_scores, idx, category):
         if db_name not in self.db_paths:
             db_path = os.path.join(self.db_dir, db_name, db_name + ".duckdb")
             self.db_paths[db_name] = db_path
@@ -613,13 +612,14 @@ class Evaluator:
             idx += 1
         turn_id = "turn " + str(idx)
 
-        self.scores[turn_id]["count"] += 1
-        self.scores["all"]["count"] += 1
+        hardness = category
 
+        self.scores[turn_id]["count"] += 1
+        self.scores[hardness]["count"] += 1
+        self.scores["all"]["count"] += 1
         if self.etype in ['all', 'match']:
             schema = self.schemas[db_name]
             g_sql = get_sql(schema, gold)
-            hardness = self.eval_hardness(g_sql)
             self.scores[hardness]["count"] += 1
 
             try:
@@ -649,8 +649,7 @@ class Evaluator:
                 progress_bar_for_each_datapoint=self.progress_bar_for_each_datapoint,
             )
             if exec_score:
-                if self.etype == 'all':
-                    self.scores[hardness]["exec"] += 1
+                self.scores[hardness]["exec"] += 1
                 self.scores[turn_id]["exec"] += 1
                 self.scores["all"]["exec"] += 1
                 turn_scores["exec"].append(1)
@@ -792,7 +791,7 @@ def print_formated_s(row_name, l, element_format):
 
 def print_scores(scores, etype, include_turn_acc=True):
     turns = TURNS
-    levels = ["easy", "medium", "hard", "extra", "all"]
+    levels = ["easy", "medium", "hard", "duckdb", "ddl", "all"]
     if include_turn_acc:
         levels.append("joint_all")
     partial_types = PARTIAL_TYPES
