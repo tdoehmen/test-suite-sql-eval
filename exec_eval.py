@@ -30,6 +30,17 @@ def unorder_row(row: Tuple) -> Tuple:
     return tuple(sorted(row, key=lambda x: str(x) + str(type(x))))
 
 
+def tuple_sublists(row: Tuple) -> Tuple:
+    new_row = []
+    for item in row:
+        if isinstance(item, list):
+            new_row.append(tuple(item))
+        else:
+            new_row.append(item)
+    new_row = tuple(new_row)
+    return new_row
+
+
 # unorder each row in the table
 # [result_1 and result_2 has the same bag of unordered row]
 # is a necessary condition of
@@ -88,6 +99,9 @@ def result_eq(result1: List[Tuple], result2: List[Tuple], order_matters: bool) -
     # if the results do not have the same number of columns, they are different
     if len(result2[0]) != num_cols:
         return False
+
+    result1 = [tuple_sublists(row) for row in result1]
+    result2 = [tuple_sublists(row) for row in result2]
 
     # unorder each row and compare whether the denotation is the same
     # this can already find most pair of denotations that are different
@@ -152,13 +166,14 @@ async def exec_on_db_(duckdb_path: str, query: str) -> Tuple[str, Any]:
         connection.close()
         return "exception", e
 
+
 async def exec_on_db(
     duckdb_path: str, query: str, process_id: str = "", timeout: int = TIMEOUT
 ) -> Tuple[str, Any]:
     try:
         return await asyncio.wait_for(exec_on_db_(duckdb_path, query), timeout)
     except asyncio.TimeoutError:
-        return ('exception', TimeoutError)
+        return ("exception", TimeoutError)
     except Exception as e:
         return ("exception", e)
 
@@ -222,7 +237,6 @@ def eval_exec_match(
         preds = chain([p_str], preds)
 
     for pred in preds:
-
         pred_passes = 1
         # compare the gold and predicted denotations on each database in the directory
         # wrap with progress bar if required
