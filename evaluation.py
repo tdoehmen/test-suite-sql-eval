@@ -600,7 +600,8 @@ class Evaluator:
 
         return res
 
-    def evaluate_one(self, db_name, gold, predicted, turn_scores, idx, category):
+    def evaluate_one(self, db_name, gold, predicted, setup_sql,
+                     validate_sqls, turn_scores, idx, category):
         if db_name not in self.db_paths:
             db_path = os.path.join(self.db_dir, db_name, db_name + ".duckdb")
             self.db_paths[db_name] = db_path
@@ -644,6 +645,8 @@ class Evaluator:
                 db=self.db_paths[db_name],
                 p_str=predicted,
                 g_str=gold,
+                setup_sql=setup_sql,
+                validate_sqls=validate_sqls,
                 plug_value=self.plug_value,
                 keep_distinct=self.keep_distinct,
                 progress_bar_for_each_datapoint=self.progress_bar_for_each_datapoint,

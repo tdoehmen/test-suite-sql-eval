@@ -12,12 +12,14 @@ import time
 import pickle as pkl
 import subprocess
 from itertools import chain
-
+import shutil
+from pathlib import Path
 from .parse import get_all_preds_for_execution, remove_distinct
 
 
 threadLock = threading.Lock()
 TIMEOUT = 60
+TMP_DIR = "_tmp"
 EXEC_TMP_DIR = os.path.join(os.path.dirname(__file__), "tmp")
 
 
@@ -142,36 +144,49 @@ def replace_cur_year(query: str) -> str:
         "YEAR\s*\(\s*CURDATE\s*\(\s*\)\s*\)\s*", "2020", query, flags=re.IGNORECASE
     )
 
+class WithDuckDBConnectionInTmpDir(object):
+    def __init__(self, databases_file, tmp_dir):
+        if not os.path.exists(databases_file):
+            raise Exception("Database note found: %s" % databases_file)
+        os.makedirs(tmp_dir)
+        shutil.copy(databases_file, tmp_dir)
+        self.tmp_dbfile = Path(databases_file).name
+        self.tmp_dir = tmp_dir
+        self.original_wd = os.getcwd()
 
-# get the database cursor for a sqlite database path
-def get_cursor_from_path(duckdb_path: str):
+    def __enter__(self):
+        os.chdir(self.tmp_dir)
+        self.con = duckdb.connect(self.tmp_dbfile)
+        return self.con
+
+    def __exit__(self, *args):
+        self.con.close()
+        os.chdir(self.original_wd)
+        shutil.rmtree(self.tmp_dir)
+
+async def exec_on_db_(duckdb_path: str, query: str, setup_sql: str, validate_sql: str) -> Tuple[str, Any]:
+    #query = replace_cur_year(query)
     try:
-        if not os.path.exists(duckdb_path):
-            print("Openning a new connection %s" % duckdb_path)
-        connection = duckdb.connect(duckdb_path)
+        with WithDuckDBConnectionInTmpDir(duckdb_path, TMP_DIR) as connection:
+            if setup_sql is not None:
+                print("Running Setup SQL:" + setup_sql)
+                connection.execute(setup_sql)
+            print("Running SQL:" +query)
+            ddb_benchmark_result_rel = connection.sql(query)
+            if ddb_benchmark_result_rel is not None:
+                connection.execute("CREATE TABLE ddb_benchmark_result AS SELECT * FROM ddb_benchmark_result_rel")
+            print("Running Validation SQL:" +validate_sql)
+            result = connection.execute(validate_sql).fetchall()
+            return "result", result
     except Exception as e:
-        print(duckdb_path)
-        raise e
-    return connection
-
-
-async def exec_on_db_(duckdb_path: str, query: str) -> Tuple[str, Any]:
-    query = replace_cur_year(query)
-    connection = get_cursor_from_path(duckdb_path)
-    try:
-        result = connection.execute(query).fetchall()
-        connection.close()
-        return "result", result
-    except Exception as e:
-        connection.close()
         return "exception", e
 
 
 async def exec_on_db(
-    duckdb_path: str, query: str, process_id: str = "", timeout: int = TIMEOUT
+    duckdb_path: str, query: str, setup_sql, validate_sql, timeout: int = TIMEOUT
 ) -> Tuple[str, Any]:
     try:
-        return await asyncio.wait_for(exec_on_db_(duckdb_path, query), timeout)
+        return await asyncio.wait_for(exec_on_db_(duckdb_path, query, setup_sql, validate_sql), timeout)
     except asyncio.TimeoutError:
         return ("exception", TimeoutError)
     except Exception as e:
@@ -196,6 +211,8 @@ def eval_exec_match(
     db: str,
     p_str: str,
     g_str: str,
+    setup_sql: str,
+    validate_sql: str,
     plug_value: bool,
     keep_distinct: bool,
     progress_bar_for_each_datapoint: bool,
@@ -246,8 +263,8 @@ def eval_exec_match(
             ranger = db_paths
 
         for db_path in ranger:
-            g_flag, g_denotation = asyncio.run(exec_on_db(db_path, g_str))
-            p_flag, p_denotation = asyncio.run(exec_on_db(db_path, pred))
+            g_flag, g_denotation = asyncio.run(exec_on_db(db_path, g_str, setup_sql=setup_sql, validate_sql=validate_sql))
+            p_flag, p_denotation = asyncio.run(exec_on_db(db_path, pred, setup_sql=setup_sql, validate_sql=validate_sql))
 
             # we should expect the gold to be succesfully executed on the database
             assert (
