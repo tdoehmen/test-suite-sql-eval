@@ -37,6 +37,9 @@ def tuple_sublists(row: Tuple) -> Tuple:
     for item in row:
         if isinstance(item, list):
             new_row.append(tuple(item))
+        elif isinstance(item, dict):
+            new_row.append(tuple(sorted(item.items(), key=lambda x: x[0])))
+            print(new_row[-1])
         else:
             new_row.append(item)
     new_row = tuple(new_row)
@@ -144,6 +147,7 @@ def replace_cur_year(query: str) -> str:
         "YEAR\s*\(\s*CURDATE\s*\(\s*\)\s*\)\s*", "2020", query, flags=re.IGNORECASE
     )
 
+
 class WithDuckDBConnectionInTmpDir(object):
     def __init__(self, databases_file, tmp_dir):
         if not os.path.exists(databases_file):
@@ -164,8 +168,11 @@ class WithDuckDBConnectionInTmpDir(object):
         os.chdir(self.original_wd)
         shutil.rmtree(self.tmp_dir)
 
-async def exec_on_db_(duckdb_path: str, query: str, setup_sql: str, validate_sql: str) -> Tuple[str, Any]:
-    #query = replace_cur_year(query)
+
+async def exec_on_db_(
+    duckdb_path: str, query: str, setup_sql: str, validate_sql: str
+) -> Tuple[str, Any]:
+    # query = replace_cur_year(query)
     try:
         with WithDuckDBConnectionInTmpDir(duckdb_path, TMP_DIR) as connection:
             if setup_sql is not None:
@@ -173,10 +180,12 @@ async def exec_on_db_(duckdb_path: str, query: str, setup_sql: str, validate_sql
                 connection.execute(setup_sql)
             ddb_benchmark_result_rel = connection.sql(query)
             if ddb_benchmark_result_rel is not None:
-                connection.execute("CREATE TABLE ddb_benchmark_result AS SELECT * FROM ddb_benchmark_result_rel")
+                connection.execute(
+                    "CREATE TABLE ddb_benchmark_result AS SELECT * FROM ddb_benchmark_result_rel"
+                )
             else:
                 connection.execute("CREATE TABLE ddb_benchmark_result(empty TEXT)")
-            print("Running Validation SQL:" +validate_sql)
+            print("Running Validation SQL:" + validate_sql)
             result = connection.execute(validate_sql).fetchall()
             return "result", result
     except Exception as e:
@@ -184,10 +193,16 @@ async def exec_on_db_(duckdb_path: str, query: str, setup_sql: str, validate_sql
 
 
 async def exec_on_db(
-    duckdb_path: str, query: str, setup_sql: str, validate_sql: str, timeout: int = TIMEOUT
+    duckdb_path: str,
+    query: str,
+    setup_sql: str,
+    validate_sql: str,
+    timeout: int = TIMEOUT,
 ) -> Tuple[str, Any]:
     try:
-        return await asyncio.wait_for(exec_on_db_(duckdb_path, query, setup_sql, validate_sql), timeout)
+        return await asyncio.wait_for(
+            exec_on_db_(duckdb_path, query, setup_sql, validate_sql), timeout
+        )
     except asyncio.TimeoutError:
         return ("exception", TimeoutError)
     except Exception as e:
@@ -264,8 +279,16 @@ def eval_exec_match(
             ranger = db_paths
 
         for db_path in ranger:
-            g_flag, g_denotation = asyncio.run(exec_on_db(db_path, g_str, setup_sql=setup_sql, validate_sql=validate_sql))
-            p_flag, p_denotation = asyncio.run(exec_on_db(db_path, pred, setup_sql=setup_sql, validate_sql=validate_sql))
+            g_flag, g_denotation = asyncio.run(
+                exec_on_db(
+                    db_path, g_str, setup_sql=setup_sql, validate_sql=validate_sql
+                )
+            )
+            p_flag, p_denotation = asyncio.run(
+                exec_on_db(
+                    db_path, pred, setup_sql=setup_sql, validate_sql=validate_sql
+                )
+            )
 
             # we should expect the gold to be succesfully executed on the database
             assert (
