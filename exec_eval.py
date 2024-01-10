@@ -171,10 +171,11 @@ async def exec_on_db_(duckdb_path: str, query: str, setup_sql: str, validate_sql
             if setup_sql is not None:
                 print("Running Setup SQL:" + setup_sql)
                 connection.execute(setup_sql)
-            print("Running SQL:" +query)
             ddb_benchmark_result_rel = connection.sql(query)
             if ddb_benchmark_result_rel is not None:
                 connection.execute("CREATE TABLE ddb_benchmark_result AS SELECT * FROM ddb_benchmark_result_rel")
+            else:
+                connection.execute("CREATE TABLE ddb_benchmark_result(empty TEXT)")
             print("Running Validation SQL:" +validate_sql)
             result = connection.execute(validate_sql).fetchall()
             return "result", result
@@ -183,7 +184,7 @@ async def exec_on_db_(duckdb_path: str, query: str, setup_sql: str, validate_sql
 
 
 async def exec_on_db(
-    duckdb_path: str, query: str, setup_sql, validate_sql, timeout: int = TIMEOUT
+    duckdb_path: str, query: str, setup_sql: str, validate_sql: str, timeout: int = TIMEOUT
 ) -> Tuple[str, Any]:
     try:
         return await asyncio.wait_for(exec_on_db_(duckdb_path, query, setup_sql, validate_sql), timeout)

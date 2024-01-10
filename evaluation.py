@@ -601,7 +601,7 @@ class Evaluator:
         return res
 
     def evaluate_one(self, db_name, gold, predicted, setup_sql,
-                     validate_sqls, turn_scores, idx, category):
+                     validate_sql, turn_scores, idx, category):
         if db_name not in self.db_paths:
             db_path = os.path.join(self.db_dir, db_name, db_name + ".duckdb")
             self.db_paths[db_name] = db_path
@@ -646,7 +646,7 @@ class Evaluator:
                 p_str=predicted,
                 g_str=gold,
                 setup_sql=setup_sql,
-                validate_sqls=validate_sqls,
+                validate_sql=validate_sql,
                 plug_value=self.plug_value,
                 keep_distinct=self.keep_distinct,
                 progress_bar_for_each_datapoint=self.progress_bar_for_each_datapoint,
@@ -859,7 +859,6 @@ def evaluate(
     keep_distinct,
     progress_bar_for_each_datapoint,
 ):
-
     with open(gold) as f:
         glist = []
         gseq_one = []
@@ -910,7 +909,7 @@ def evaluate(
             p_str = p_str.replace("value", "1")
             g_str, db_name = g
 
-            results.append(evaluator.evaluate_one(db_name, g_str, p_str, turn_scores, idx))
+            results.append(evaluator.evaluate_one(db_name, g_str, p_str, "", "", turn_scores, idx, ""))
 
         if all(v == 1 for v in turn_scores["exec"]):
             evaluator.scores["joint_all"]["exec"] += 1
