@@ -9,12 +9,10 @@ def get_manifest(
     manifest_engine: str,
 ) -> Manifest:
     """Get manifest engine."""
-    if manifest_client in {"openai", "openaichat", "openai_mock"}:
+    if manifest_client in {"openai", "openaichat", "openai_mock", "openrouter"}:
         manifest = Manifest(
             client_name=manifest_client,
             engine=manifest_engine,
-            cache_name="redis",
-            cache_connection="localhost:6411",
         )
     elif manifest_client in {"huggingface"}:
         manifest = Manifest(
@@ -25,8 +23,6 @@ def get_manifest(
                 )
                 for manifest_conn in manifest_connection.split(";")
             ],
-            cache_name="redis",
-            cache_connection="localhost:6411",
         )
     else:
         raise ValueError(f"Unknown manifest client {manifest_client}")

@@ -27,7 +27,7 @@ def instruction_to_sql(
     prompt_formatter: RajkumarFormatter = None,
     overwrite_manifest: bool = False,
     max_tokens: int = 300,
-    temperature: float = 0.0,
+    temperature: float = 0.1,
     stop_sequences: list[str] | None = None,
     num_beams: int = 1,
 ) -> TextToSQLModelResponse:
@@ -39,7 +39,7 @@ def instruction_to_sql(
         prompt_formatter=prompt_formatter,
         overwrite_manifest=overwrite_manifest,
         max_tokens=max_tokens,
-        temperature=temperature,
+        temperature=0.1,
         stop_sequences=stop_sequences,
         num_beams=num_beams,
     )[0]
@@ -52,7 +52,7 @@ def instruction_to_sql_list(
     prompt_formatter: RajkumarFormatter = None,
     overwrite_manifest: bool = False,
     max_tokens: int = 300,
-    temperature: float = 0.0,
+    temperature: float = 0.1,
     stop_sequences: list[str] | None = None,
     num_beams: int = 1,
     verbose: bool = False,
@@ -121,8 +121,8 @@ def instruction_to_sql_list(
         overwrite_cache=overwrite_manifest,
         num_beams=num_beams,
         logprobs=5,
-        temperature=temperature,
-        do_sample=False if temperature <= 0 else True,
+        temperature=0.1,
+        do_sample=False if 0.1 <= 0 else True,
         stop_sequences=stop_sequences or prompt_formatter.stop_sequences,
     )
 

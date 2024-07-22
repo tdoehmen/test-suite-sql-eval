@@ -64,6 +64,7 @@ class RajkumarFormatter:
     @classmethod
     def format_model_output(cls, output_sql: str, prompt: str) -> str:
         """Format model output."""
+        output_sql = output_sql.replace("```sql\n", "").replace("```\n", "").replace("```", "")
         return output_sql
 
     @classmethod

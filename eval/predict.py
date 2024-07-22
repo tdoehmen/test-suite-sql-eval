@@ -39,7 +39,7 @@ def generate_sql(
     stop_tokens: list[str] | None = None,
     overwrite_manifest: bool = False,
     max_tokens: int = 300,
-    temperature: float = 0.01,
+    temperature: float = 0.1,
     num_beams: int = 2,
     parallel: bool = False,
 ) -> list[tuple[str, TextToSQLModelResponse]]:
@@ -54,7 +54,7 @@ def generate_sql(
             prompt_formatter=prompt_formatter,
             overwrite_manifest=overwrite_manifest,
             max_tokens=max_tokens,
-            temperature=temperature,
+            temperature=0.1,
             stop_sequences=stop_tokens,
             num_beams=num_beams,
         )
@@ -138,12 +138,12 @@ def cli() -> None:
     type=click.Path(
         exists=True, file_okay=True, dir_okay=True, readable=True, path_type=Path
     ),
-    default="eval/docs/duckdb-web/docs/archive/0.9.2/sql",
+    default="eval/docs/duckdb-web/docs/archive/0.9/sql",
 )
 @click.option("--num-retrieved-docs", type=int, default=0)
 # Manifest options
 @click.option("--manifest-client", type=str, default="openai")
-@click.option("--manifest-engine", type=str, default="gpt-4-1106-preview")
+@click.option("--manifest-engine", type=str, default="gpt-4o")
 @click.option("--manifest-connection", type=str, default="http://localhost:5005")
 @click.option("--overwrite-manifest", is_flag=True, default=False)
 @click.option("--parallel", is_flag=True, default=False)
@@ -213,7 +213,7 @@ def predict(
     console.print(f"Running with {manifest_params} manifest.")
     model_name = manifest_params.get("engine", manifest_params["model_name"])
 
-    if "openai" in manifest_client:
+    if manifest_client in {"openai", "openrouter"}:
         tokenizer = AutoTokenizer.from_pretrained("gpt2", trust_remote_code=True)
     else:
         tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
@@ -234,7 +234,7 @@ def predict(
         middleix = manifest_engine
     elif manifest_client in {"huggingface", "ray"}:
         middleix = Path(manifest_params.get("model_path", "")).name.replace("/", "-")
-    elif manifest_client == "toma":
+    elif manifest_client in {"toma", "openrouter"}:
         middleix = manifest_engine.split("/")[-1]
     else:
         raise ValueError(f"Unknown manifest client {manifest_client}")
@@ -332,7 +332,7 @@ def predict(
                 "raw_pred": model_response.output,
                 "raw_output": model_response.raw_output,
                 "prompt": model_response.final_prompt,
-                "tables": [tbl.model_dump() for tbl in text_to_sql_in[i].tables or []],
+                "tables": [tbl.dict() for tbl in text_to_sql_in[i].tables or []],
             }
             formatted_entry = data_formatter.format_output(entry)
             print(json.dumps(formatted_entry), file=fout)

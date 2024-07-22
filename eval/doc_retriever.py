@@ -14,8 +14,6 @@ console = Console(soft_wrap=True)
 try:
     EMBEDDING_MODEL = Manifest(
         client_name="openaiembedding",
-        cache_name="sqlite",
-        cache_connection=".manifest.sqlite",
     )
 except Exception as e:
     console.print(e)
